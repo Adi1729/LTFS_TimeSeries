@@ -23,7 +23,18 @@ dataset['application_date'] = dataset['application_date'].apply(lambda x : datet
 ADF = pd.DataFrame(columns = range(7))
 state_list ='TAMIL NADU'
 segment =2
-for state_name in dataset['state'].unique().tolist():
+
+state_list_2=['ASSAM', 'BIHAR', 'CHHATTISGARH', 'GUJARAT', 'HARYANA',
+       'JHARKHAND', 'KERALA', 'KARNATAKA', 'MAHARASHTRA',
+       'MADHYA PRADESH', 'ORISSA', 'PUNJAB', 'TAMIL NADU', 'TRIPURA',
+       'UTTAR PRADESH', 'WEST BENGAL']
+
+state_list_2_1=[ 'CHHATTISGARH', 'GUJARAT',
+       'KERALA', 'KARNATAKA', 'MAHARASHTRA',
+       'MADHYA PRADESH', 'ORISSA', 'PUNJAB', 'TAMIL NADU', 
+       'UTTAR PRADESH', 'WEST BENGAL']
+
+for state_name in state_list_2_1:
         
     state = dataset[(dataset['segment']==segment)][['application_date','case_count']].reset_index()
     state = state.groupby(['application_date'])['case_count'].sum().reset_index()
@@ -36,10 +47,9 @@ for state_name in dataset['state'].unique().tolist():
 
 ADF.columns = dfoutput.index
 
-ADF.to_csv('./Output/ADF_segment_1.csv')
+ADF.to_csv('./Output/ADF_segment_2.csv')
 
 ## plot graph
-
 
 plt.xlabel("Date")
 plt.ylabel("Case Count")
@@ -68,8 +78,6 @@ plot_acf_pac(datasetLogScaleMinusMovingAverage)
 datasetLogScaleMinusMovingAverage.dropna(inplace=True)
 datasetLogScaleMinusMovingAverage.head(10)
 
-
-
 # ExponentialDecayWeightedAverage
 exponentialDecayWeightedAverage = np.log(indexedDataset+1).ewm(halflife = 365,min_periods=0,adjust= True).mean()
 plt.plot(np.log(indexedDataset+1))
@@ -78,16 +86,16 @@ plt.plot(exponentialDecayWeightedAverage)
 
 # AR Model
 from statsmodels.tsa.arima_model import ARIMA
-
-model = ARIMA(indexedDataset, order = (2,0,1))
+indexedDataset = np.log(indexedDataset+1)
+model = ARIMA(indexedDataset, order = (0,0,0))
 results_AR = model.fit(disp = -1)
 plt.plot(indexedDataset, color = 'green')
 plt.plot(results_AR.fittedvalues,color ='red')
 
 a= results_AR.fittedvalues.values 
 b= indexedDataset.values
-#a= np.exp(a)-1
-#b= np.exp(b)- 1
+a= np.exp(a)-1
+b= np.exp(b)- 1
 plt.title('MAPE %.4f'%mean_absolute_percentage_error(a,b))
 print('Plotting AR Model')
 
@@ -104,7 +112,7 @@ start_index = datetime(2019,6,7)
 end_index = datetime(2019,9,30)
 fts <- forecast(model, level = c(90))
 valid =90
-forecast = results_AR.forecast(steps=87)[1]
+forecast = np.exp(results_AR.forecast(steps=87)[1])-1
 forecast_segment1 = forecast
 
 # invert the differenced forecast to something usable
@@ -123,8 +131,6 @@ print(results.summary().tables[1])
 results.plot_diagnostics(figsize=(18, 8))
 plt.show()
 
-
-
 pred = results.get_prediction(start=pd.to_datetime('2019-06-07'), dynamic=False)
 pred_ci = pred.conf_int()
 ax =indexedDataset.plot(label='observed')
@@ -137,11 +143,20 @@ ax.set_ylabel('Retail_sold')
 plt.legend()
 plt.show()
 
-
-
 y_forecasted = pred.predicted_mean
 y_truth = indexedDataset
 mse = ((y_forecasted - y_truth) ** 2).mean()
 mean_absolute_percentage_error(y_forecasted,y_truth)
 print('The Mean Squared Error is {}'.format(round(mse, 2)))
 print('The Root Mean Squared Error is {}'.format(round(np.sqrt(mse), 2)))
+
+
+from pyramid.arima import auto_arima
+stepwise_model = auto_arima(data, start_p=1, start_q=1,
+                           max_p=3, max_q=3, m=12,
+                           start_P=0, seasonal=True,
+                           d=1, D=1, trace=True,
+                           error_action='ignore',  
+                           suppress_warnings=True, 
+                           stepwise=True)
+print(stepwise_model.aic())
